@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HKI – Haitien Kapital Investisment</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--night:#0B1E3F;--gold:#C9A24A;--soft:#F3F4F7;--muted:#5b667d;--line:#dde1ea;--bad:#b4452f;--ok:#2f7d4f}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14213d;font:16px/1.55 system-ui,Arial,sans-serif}
+.wrap{max-width:420px;margin:0 auto;padding:1.2rem}
+h1{font-family:Georgia,serif;color:var(--night);font-size:2rem;margin:.4rem 0}
+h2{font-family:Georgia,serif;color:var(--night)}
+.logo{font-family:Georgia,serif;font-size:2.6rem;font-weight:700;color:var(--night);text-align:center;letter-spacing:.06em}
+.logo b{color:var(--gold)}
+.sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:1.2rem}
+label{display:block;font-size:.9rem;font-weight:600;margin-top:.9rem}
+input{width:100%;padding:.8rem;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:.3rem}
+button{font:inherit;cursor:pointer}
+.btn{width:100%;background:var(--gold);color:#1a1405;border:0;border-radius:10px;padding:.85rem;font-weight:700;margin-top:1.1rem}
+.btn.line{background:#fff;border:1.5px solid var(--night);color:var(--night)}
+.link{background:none;border:0;color:var(--night);text-decoration:underline;padding:0}
+.msg{min-height:1.4rem;margin-top:.7rem;font-size:.9rem;color:var(--bad)}
+.msg.ok{color:var(--ok)}
+.card{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1rem}
+.sm{font-size:.85rem;color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">H<b>K</b>I</div>
+  <p class="sub">Haitien Kapital Investisment</p>
+
+  <section id="login">
+    <h2>Connexion</h2>
+    <label for="l-mail">E-mail</label>
+    <input id="l-mail" type="email" autocomplete="username">
+    <label for="l-pw">Mot de passe</label>
+    <input id="l-pw" type="password" autocomplete="current-password">
+    <div class="msg" id="l-msg" role="alert"></div>
+    <button class="btn" id="l-go">Se connecter</button>
+    <p class="sm" style="text-align:center">Pas encore de compte ? <button class="link" id="to-signup">Créer un compte</button></p>
+  </section>
+
+  <section id="signup" hidden>
+    <h2>Créer un compte</h2>
+    <label for="s-nom">Nom complet</label>
+    <input id="s-nom" type="text" autocomplete="name">
+    <label for="s-tel">Téléphone</label>
+    <input id="s-tel" type="tel" autocomplete="tel">
+    <label for="s-mail">E-mail</label>
+    <input id="s-mail" type="email" autocomplete="email">
+    <label for="s-pw">Mot de passe (8 caractères minimum)</label>
+    <input id="s-pw" type="password" autocomplete="new-password">
+    <div class="msg" id="s-msg" role="alert"></div>
+    <button class="btn" id="s-go">Créer mon compte</button>
+    <p class="sm" style="text-align:center">Déjà un compte ? <button class="link" id="to-login">Se connecter</button></p>
+  </section>
+
+  <section id="home" hidden>
+    <h2 id="hello"></h2>
+    <div class="card"><div class="sm">Votre rôle</div><b id="role"></b></div>
+    <div class="card"><div class="sm">Projets disponibles</div><div id="projets"></div></div>
+    <p class="sm">Investir comporte des risques. Aucun gain n’est garanti.</p>
+    <button class="btn line" id="out">Se déconnecter</button>
+  </section>
+</div>
+
+<script>
+var SUPABASE_URL = "https://ejyvjrpfblpplnjuhqua.supabase.co";
+var SUPABASE_KEY = "sb_publishable_yktmeXVeEjcD5eoCjzDAHA_6PuBd2tV";
+var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+var $ = function(i){ return document.getElementById(i); };
+
+function show(id){
+  ["login","signup","home"].forEach(function(s){ $(s).hidden = (s !== id); });
+}
+function msg(id, text, ok){
+  $(id).textContent = text;
+  $(id).className = ok ? "msg ok" : "msg";
+}
+
+$("to-signup").onclick = function(){ show("signup"); };
+$("to-login").onclick = function(){ show("login"); };
+
+$("s-go").onclick = async function(){
+  var nom = $("s-nom").value.trim(), tel = $("s-tel").value.trim();
+  var mail = $("s-mail").value.trim(), pw = $("s-pw").value;
+  if (nom.length < 3) return msg("s-msg", "Entrez votre nom complet.");
+  if (tel.length < 8) return msg("s-msg", "Entrez votre numéro de téléphone.");
+  if (!mail) return msg("s-msg", "Entrez votre e-mail.");
+  if (pw.length < 8) return msg("s-msg", "Le mot de passe doit avoir 8 caractères minimum.");
+  msg("s-msg", "Création du compte…", true);
+  var r = await sb.auth.signUp({ email: mail, password: pw, options: { data: { nom: nom, telephone: tel } } });
+  if (r.error) return msg("s-msg", "Impossible de créer le compte : " + r.error.message);
+  $("s-pw").value = "";
+  msg("s-msg", "Compte créé. Si on vous le demande, confirmez votre e-mail, puis connectez-vous.", true);
+};
+
+$("l-go").onclick = async function(){
+  var mail = $("l-mail").value.trim(), pw = $("l-pw").value;
+  if (!mail || !pw) return msg("l-msg", "Entrez votre e-mail et votre mot de passe.");
+  msg("l-msg", "Connexion…", true);
+  var r = await sb.auth.signInWithPassword({ email: mail, password: pw });
+  if (r.error) return msg("l-msg", "E-mail ou mot de passe incorrect.");
+  $("l-pw").value = "";
+  msg("l-msg", "");
+  await ouvrir();
+};
+
+async function ouvrir(){
+  var u = await sb.auth.getUser();
+  if (!u.data.user) return show("login");
+  var p = await sb.from("profiles").select("nom, role, statut").eq("id", u.data.user.id).single();
+  if (p.error || !p.data) { await sb.auth.signOut(); show("login"); return msg("l-msg", "Profil introuvable."); }
+  if (p.data.statut !== "actif") { await sb.auth.signOut(); show("login"); return msg("l-msg", "Ce compte est suspendu."); }
+  $("hello").textContent = "Bonjour " + p.data.nom;
+  $("role").textContent = p.data.role;
+  var pr = await sb.from("projets").select("nom, secteur").order("created_at", { ascending: false });
+  var box = $("projets"); box.textContent = "";
+  if (pr.error || !pr.data.length) { box.textContent = "Aucun projet pour le moment."; }
+  else pr.data.forEach(function(x){
+    var d = document.createElement("div");
+    d.textContent = x.nom + " (" + x.secteur + ")";
+    box.appendChild(d);
+  });
+  show("home");
+}
+
+$("out").onclick = async function(){ await sb.auth.signOut(); show("login"); };
+
+sb.auth.getSession().then(function(r){ if (r.data.session) ouvrir(); });
+</script>
+</body>
+</html>
