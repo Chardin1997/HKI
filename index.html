@@ -9,17 +9,19 @@
 :root{--night:#0B1E3F;--gold:#C9A24A;--soft:#F3F4F7;--muted:#5b667d;--line:#dde1ea;--bad:#b4452f;--ok:#2f7d4f;--wait:#9a6b00}
 *{box-sizing:border-box}
 body{margin:0;background:#fff;color:#14213d;font:16px/1.55 system-ui,Arial,sans-serif}
-.wrap{max-width:460px;margin:0 auto;padding:1.2rem}
+.wrap{max-width:480px;margin:0 auto;padding:1.2rem}
 h2{font-family:Georgia,serif;color:var(--night);margin:1.2rem 0 .4rem}
+h3{font-family:Georgia,serif;color:var(--night);margin:1rem 0 .3rem}
 .logo{font-family:Georgia,serif;font-size:2.6rem;font-weight:700;color:var(--night);text-align:center;letter-spacing:.06em}
 .logo b{color:var(--gold)}
 .sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:1.2rem}
 label{display:block;font-size:.9rem;font-weight:600;margin-top:.9rem}
-input,select,textarea{width:100%;padding:.8rem;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:.3rem;background:#fff;color:#14213d}
+input,select,textarea{display:block;width:100%;padding:.8rem;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:.3rem;background:#fff;color:#14213d}
 button{font:inherit;cursor:pointer}
 .btn{width:100%;background:var(--gold);color:#1a1405;border:0;border-radius:10px;padding:.85rem;font-weight:700;margin-top:1.1rem}
 .btn.line{background:#fff;border:1.5px solid var(--night);color:var(--night)}
-.btn.sm2{padding:.6rem;margin-top:.6rem}
+.btn.red{background:var(--bad);color:#fff}
+.sm2{padding:.6rem;margin-top:.6rem}
 .link{background:none;border:0;color:var(--night);text-decoration:underline;padding:0}
 .msg{min-height:1.4rem;margin-top:.7rem;font-size:.9rem;color:var(--bad)}
 .msg.ok{color:var(--ok)}
@@ -29,8 +31,14 @@ button{font:inherit;cursor:pointer}
 .bar{height:8px;background:var(--line);border-radius:9px;overflow:hidden;margin:.5rem 0 .3rem}
 .bar i{display:block;height:100%;background:var(--gold)}
 .badge{display:inline-block;font-size:.75rem;font-weight:700;border-radius:99px;padding:.1rem .6rem;border:1px solid currentColor}
-.b-actif{color:var(--ok)}.b-suspendu{color:var(--bad)}
-.box{border-top:3px solid var(--gold);margin-top:1.2rem;padding-top:.2rem}
+.b-actif{color:var(--ok)}.b-suspendu,.b-bloque,.b-supprime{color:var(--bad)}
+.box{border-top:3px solid var(--gold);margin-top:1rem;padding-top:.2rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:1rem}
+.tile{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:1rem;text-align:left;color:var(--night);min-height:96px}
+.tile strong{display:block;font-family:Georgia,serif;font-size:1.1rem}
+.tile span{font-size:.8rem;color:var(--muted)}
+.gest{border-top:1px dashed var(--line);margin-top:.8rem;padding-top:.4rem}
+.toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:var(--ok);color:#fff;padding:.7rem 1rem;border-radius:10px;z-index:50;max-width:90%}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -68,31 +76,7 @@ button{font:inherit;cursor:pointer}
   <section id="home" hidden>
     <h2 id="hello" style="margin-top:0"></h2>
     <div class="card"><div class="sm">Votre rôle</div><b id="role"></b></div>
-
-    <div id="admin" class="box" hidden>
-      <h2>Ajouter un projet</h2>
-      <label for="p-nom">Nom du projet</label>
-      <input id="p-nom" type="text">
-      <label for="p-sec">Secteur</label>
-      <select id="p-sec"></select>
-      <label for="p-need">Montant à collecter (HTG)</label>
-      <input id="p-need" type="number" inputmode="numeric">
-      <label for="p-min">Participation minimum (HTG)</label>
-      <input id="p-min" type="number" inputmode="numeric">
-      <label for="p-mois">Durée (mois)</label>
-      <input id="p-mois" type="number" inputmode="numeric" value="12">
-      <label for="p-desc">Description</label>
-      <textarea id="p-desc" rows="3"></textarea>
-      <label for="p-risk">Risques</label>
-      <textarea id="p-risk" rows="3"></textarea>
-      <label for="p-cond">Conditions de remboursement ou de distribution</label>
-      <textarea id="p-cond" rows="3"></textarea>
-      <div class="msg" id="p-msg" role="alert"></div>
-      <button class="btn" id="p-go">Publier le projet</button>
-    </div>
-
-    <h2 id="ptitle">Projets disponibles</h2>
-    <div id="projets"></div>
+    <div id="main"></div>
     <p class="sm">Investir comporte des risques. Aucun gain n’est garanti.</p>
     <button class="btn line" id="out">Se déconnecter</button>
   </section>
@@ -104,17 +88,30 @@ var SUPABASE_KEY = "sb_publishable_yktmeXVeEjcD5eoCjzDAHA_6PuBd2tV";
 var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var $ = function(i){ return document.getElementById(i); };
 var SECTEURS = ["Agriculture et élevage","Immobilier et construction","Commerce et distribution","Entrepreneuriat et PME","Énergies renouvelables","Technologie et innovation","Autres projets économiques"];
-var monRole = null, monId = null;
+var BLOQ = { bloque: "Ce compte est bloqué. Contactez l’assistance.", suspendu: "Ce compte est suspendu. Contactez l’assistance.", supprime: "Ce compte a été supprimé." };
+var moi = null;
 
-SECTEURS.forEach(function(s){
-  var o = document.createElement("option"); o.textContent = s; $("p-sec").appendChild(o);
-});
-
+/* ---------- petits outils ---------- */
+function el(tag, text, cls){ var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
+function clear(e){ while (e.firstChild) e.removeChild(e.firstChild); }
+function fmt(n){ return Number(n).toLocaleString("fr-FR") + " HTG"; }
+function fd(x){ return new Date(x).toLocaleDateString("fr-FR"); }
+function inp(type){ var i = document.createElement("input"); i.type = type; if (type === "number") i.inputMode = "numeric"; return i; }
+function area(rows){ var t = document.createElement("textarea"); t.rows = rows || 3; return t; }
+function sel(opts){
+  var s = document.createElement("select");
+  opts.forEach(function(o){ var op = document.createElement("option"); if (typeof o === "string") { op.textContent = o; } else { op.value = o[0]; op.textContent = o[1]; } s.appendChild(op); });
+  return s;
+}
+function field(t, c){ var l = el("label"); l.appendChild(document.createTextNode(t)); l.appendChild(c); return l; }
+function btn(text, cls, fn){ var b = el("button", text, cls || "btn"); b.onclick = fn; return b; }
+function msgEl(){ var m = el("div", null, "msg"); m.setAttribute("role", "alert"); return m; }
+function say(m, t, ok){ m.textContent = t; m.className = ok ? "msg ok" : "msg"; }
+function toast(t){ var d = el("div", t, "toast"); document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 3500); }
 function show(id){ ["login","signup","home"].forEach(function(s){ $(s).hidden = (s !== id); }); }
 function msg(id, text, ok){ $(id).textContent = text; $(id).className = ok ? "msg ok" : "msg"; }
-function fmt(n){ return Number(n).toLocaleString("fr-FR") + " HTG"; }
-function el(tag, text, cls){ var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
 
+/* ---------- connexion et inscription ---------- */
 $("to-signup").onclick = function(){ show("signup"); };
 $("to-login").onclick = function(){ show("login"); };
 
@@ -143,88 +140,348 @@ $("l-go").onclick = async function(){
   await ouvrir();
 };
 
-async function journal(action){
-  if (!monId) return;
-  await sb.from("journal").insert({ acteur_id: monId, action: action });
-}
-
-async function chargerProjets(){
-  var box = $("projets"); box.textContent = "";
-  var r = await sb.from("projets")
-    .select("id, nom, secteur, montant_necessaire, montant_collecte, minimum, duree_mois, statut, risques, conditions")
-    .order("created_at", { ascending: false });
-  if (r.error) { box.textContent = "Impossible de charger les projets."; return; }
-  if (!r.data.length) { box.textContent = "Aucun projet pour le moment."; return; }
-  r.data.forEach(function(p){
-    var c = el("div", null, "card");
-    var top = el("div");
-    if (monRole === "admin") { top.appendChild(el("span", p.statut === "actif" ? "Actif" : "Suspendu", "badge b-" + p.statut)); top.appendChild(document.createTextNode(" ")); }
-    top.appendChild(el("b", p.nom));
-    c.appendChild(top);
-    c.appendChild(el("div", p.secteur, "sm"));
-    var pc = Math.min(100, Math.round(p.montant_collecte / p.montant_necessaire * 100));
-    var bar = el("div", null, "bar"); var fill = document.createElement("i"); fill.style.width = pc + "%"; bar.appendChild(fill);
-    c.appendChild(bar);
-    c.appendChild(el("div", fmt(p.montant_collecte) + " collectés sur " + fmt(p.montant_necessaire) + " (" + pc + " %)", "sm"));
-    c.appendChild(el("div", "Minimum " + fmt(p.minimum) + " · " + p.duree_mois + " mois", "sm"));
-    if (p.risques) c.appendChild(el("div", "Risques : " + p.risques, "sm"));
-    if (p.conditions) c.appendChild(el("div", "Conditions : " + p.conditions, "sm"));
-    if (monRole === "admin") {
-      var b = el("button", p.statut === "actif" ? "Suspendre" : "Réactiver", "btn line sm2");
-      b.onclick = async function(){
-        var nv = p.statut === "actif" ? "suspendu" : "actif";
-        var u = await sb.from("projets").update({ statut: nv }).eq("id", p.id);
-        if (u.error) return alert("Action impossible : " + u.error.message);
-        await journal("Projet « " + p.nom + " » : " + (nv === "actif" ? "réactivé" : "suspendu"));
-        chargerProjets();
-      };
-      c.appendChild(b);
-    }
-    box.appendChild(c);
-  });
-}
-
-$("p-go").onclick = async function(){
-  var nom = $("p-nom").value.trim(), need = parseInt($("p-need").value, 10), mn = parseInt($("p-min").value, 10), mo = parseInt($("p-mois").value, 10);
-  var d = $("p-desc").value.trim(), r = $("p-risk").value.trim(), c = $("p-cond").value.trim(), all = d + " " + r + " " + c;
-  var bad = /(sans risque|100 ?%|rendement garanti|b[ée]n[ée]fices? garantis?|gains? garantis?)/i.test(all)
-         && !/(aucun|pas de|non)\s+(rendement|b[ée]n[ée]fice|gain)/i.test(all);
-  var e = nom.length < 3 ? "Entrez le nom du projet."
-    : !(need > 0) ? "Entrez le montant à collecter."
-    : !(mn > 0) ? "Entrez la participation minimum."
-    : mn > need ? "Le minimum ne peut pas dépasser le montant à collecter."
-    : !(mo > 0) ? "Entrez la durée en mois."
-    : d.length < 10 ? "Ajoutez une description (10 caractères minimum)."
-    : r.length < 5 ? "Les risques sont obligatoires."
-    : c.length < 5 ? "Les conditions sont obligatoires."
-    : bad ? "Ne promettez jamais de bénéfices garantis ni « sans risque »." : "";
-  if (e) return msg("p-msg", e);
-  msg("p-msg", "Publication…", true);
-  var ins = await sb.from("projets").insert({ nom: nom, secteur: $("p-sec").value, description: d, montant_necessaire: need, minimum: mn, duree_mois: mo, risques: r, conditions: c });
-  if (ins.error) return msg("p-msg", "Impossible de publier : " + ins.error.message);
-  await journal("Projet publié : " + nom);
-  ["p-nom","p-need","p-min","p-desc","p-risk","p-cond"].forEach(function(i){ $(i).value = ""; });
-  $("p-mois").value = "12";
-  msg("p-msg", "Projet publié.", true);
-  chargerProjets();
-};
-
 async function ouvrir(){
   var u = await sb.auth.getUser();
   if (!u.data.user) return show("login");
   var p = await sb.from("profiles").select("nom, role, statut").eq("id", u.data.user.id).single();
   if (p.error || !p.data) { await sb.auth.signOut(); show("login"); return msg("l-msg", "Profil introuvable."); }
-  if (p.data.statut !== "actif") { await sb.auth.signOut(); show("login"); return msg("l-msg", "Ce compte est suspendu."); }
-  monRole = p.data.role; monId = u.data.user.id;
-  $("hello").textContent = "Bonjour " + p.data.nom;
-  $("role").textContent = monRole;
-  $("admin").hidden = (monRole !== "admin");
-  $("ptitle").textContent = monRole === "admin" ? "Tous les projets" : "Projets disponibles";
+  if (p.data.statut !== "actif") { await sb.auth.signOut(); show("login"); return msg("l-msg", BLOQ[p.data.statut] || "Ce compte n’est pas actif."); }
+  moi = { id: u.data.user.id, nom: p.data.nom, role: p.data.role };
+  $("hello").textContent = "Bonjour " + moi.nom;
+  $("role").textContent = moi.role;
   show("home");
-  await chargerProjets();
+  if (moi.role === "admin") menuAdmin(); else await vueUtilisateur();
 }
 
-$("out").onclick = async function(){ await sb.auth.signOut(); monRole = null; monId = null; show("login"); };
+$("out").onclick = async function(){ await sb.auth.signOut(); moi = null; clear($("main")); show("login"); };
+
+/* ---------- traçabilité ---------- */
+async function journal(action){ if (moi) await sb.from("journal").insert({ acteur_id: moi.id, action: action }); }
+async function sanction(profileId, type, motif){
+  var r = await sb.from("sanctions").insert({ profile_id: profileId, type: type, motif: motif, admin_id: moi.id });
+  return r.error;
+}
+
+/* ---------- projets (liste + partage) ---------- */
+function partager(p){
+  var url = location.origin + location.pathname;
+  var texte = "Découvrez le projet « " + p.nom + " » sur HKI : " + url;
+  if (navigator.share) { navigator.share({ title: "HKI – " + p.nom, text: texte, url: url }).catch(function(){}); }
+  else if (navigator.clipboard) { navigator.clipboard.writeText(texte).then(function(){ toast("Lien copié."); }); }
+  else { prompt("Copiez ce texte :", texte); }
+}
+
+async function listeProjets(list, admin){
+  clear(list);
+  var r = await sb.from("projets").select("id, nom, secteur, montant_necessaire, montant_collecte, minimum, duree_mois, statut, risques, conditions").order("created_at", { ascending: false });
+  if (r.error) { list.textContent = "Impossible de charger les projets."; return; }
+  if (!r.data.length) { list.textContent = "Aucun projet pour le moment."; return; }
+  r.data.forEach(function(p){
+    var c = el("div", null, "card");
+    var top = el("div");
+    if (admin) { top.appendChild(el("span", p.statut === "actif" ? "Actif" : "Suspendu", "badge b-" + p.statut)); top.appendChild(document.createTextNode(" ")); }
+    top.appendChild(el("b", p.nom));
+    c.appendChild(top);
+    c.appendChild(el("div", p.secteur, "sm"));
+    var pc = Math.min(100, Math.round(p.montant_collecte / p.montant_necessaire * 100));
+    var bar = el("div", null, "bar"), fill = document.createElement("i"); fill.style.width = pc + "%"; bar.appendChild(fill);
+    c.appendChild(bar);
+    c.appendChild(el("div", fmt(p.montant_collecte) + " collectés sur " + fmt(p.montant_necessaire) + " (" + pc + " %)", "sm"));
+    c.appendChild(el("div", "Minimum " + fmt(p.minimum) + " · " + p.duree_mois + " mois", "sm"));
+    if (p.risques) c.appendChild(el("div", "Risques : " + p.risques, "sm"));
+    if (p.conditions) c.appendChild(el("div", "Conditions : " + p.conditions, "sm"));
+    c.appendChild(btn("Partager", "btn line sm2", function(){ partager(p); }));
+    if (admin) {
+      c.appendChild(btn(p.statut === "actif" ? "Suspendre" : "Réactiver", "btn line sm2", async function(){
+        var nv = p.statut === "actif" ? "suspendu" : "actif";
+        var u = await sb.from("projets").update({ statut: nv }).eq("id", p.id);
+        if (u.error) return alert("Action impossible : " + u.error.message);
+        await journal("Projet « " + p.nom + " » : " + (nv === "actif" ? "réactivé" : "suspendu"));
+        listeProjets(list, true);
+      }));
+    }
+    list.appendChild(c);
+  });
+}
+
+/* ---------- vue client / agent ---------- */
+async function vueUtilisateur(){
+  var m = $("main"); clear(m);
+  var a = await sb.from("annonces").select("titre, contenu, created_at").order("created_at", { ascending: false }).limit(5);
+  if (!a.error && a.data.length) {
+    m.appendChild(el("h2", "Annonces"));
+    a.data.forEach(function(x){
+      var c = el("div", null, "card");
+      c.appendChild(el("b", x.titre));
+      c.appendChild(el("div", fd(x.created_at), "sm"));
+      c.appendChild(el("div", x.contenu));
+      m.appendChild(c);
+    });
+  }
+  m.appendChild(el("h2", "Projets disponibles"));
+  var list = el("div"); m.appendChild(list);
+  if (moi.role === "agent") m.appendChild(el("p", "L’espace agent arrive bientôt.", "sm"));
+  await listeProjets(list, false);
+}
+
+/* ---------- menu administrateur ---------- */
+function menuAdmin(){
+  var m = $("main"); clear(m);
+  m.appendChild(el("h2", "Espace administrateur"));
+  var g = el("div", null, "grid");
+  [["Publier un projet", "Créer, suspendre, partager", panelProjets],
+   ["Inscrits", "Sanctions, blocage, suppression", panelInscrits],
+   ["Investissements", "Montants et échéances", panelInvest],
+   ["Agents", "Nommer, suspendre, retirer", panelAgents],
+   ["Annonces", "Informer les utilisateurs", panelAnnonces]].forEach(function(t){
+    var b = el("button", null, "tile");
+    b.appendChild(el("strong", t[0])); b.appendChild(el("span", t[1]));
+    b.onclick = t[2]; g.appendChild(b);
+  });
+  m.appendChild(g);
+  window.scrollTo(0, 0);
+}
+function panel(titre){
+  var m = $("main"); clear(m);
+  m.appendChild(btn("← Retour au menu", "link", menuAdmin));
+  m.appendChild(el("h2", titre));
+  window.scrollTo(0, 0);
+  return m;
+}
+
+/* 1) publier un projet */
+async function panelProjets(){
+  var m = panel("Projets");
+  var box = el("div", null, "box"); box.appendChild(el("h3", "Ajouter un projet"));
+  var f = { nom: inp("text"), sec: sel(SECTEURS), need: inp("number"), min: inp("number"), mois: inp("number"), desc: area(3), risk: area(3), cond: area(3) };
+  f.mois.value = "12";
+  box.appendChild(field("Nom du projet", f.nom));
+  box.appendChild(field("Secteur", f.sec));
+  box.appendChild(field("Montant à collecter (HTG)", f.need));
+  box.appendChild(field("Participation minimum (HTG)", f.min));
+  box.appendChild(field("Durée (mois)", f.mois));
+  box.appendChild(field("Description", f.desc));
+  box.appendChild(field("Risques", f.risk));
+  box.appendChild(field("Conditions de remboursement ou de distribution", f.cond));
+  var pm = msgEl(); box.appendChild(pm);
+  var list = el("div");
+  box.appendChild(btn("Publier le projet", "btn", async function(){
+    var nom = f.nom.value.trim(), need = parseInt(f.need.value, 10), mn = parseInt(f.min.value, 10), mo = parseInt(f.mois.value, 10);
+    var d = f.desc.value.trim(), r = f.risk.value.trim(), c = f.cond.value.trim(), all = d + " " + r + " " + c;
+    var bad = /(sans risque|100 ?%|rendement garanti|b[ée]n[ée]fices? garantis?|gains? garantis?)/i.test(all)
+           && !/(aucun|pas de|non)\s+(rendement|b[ée]n[ée]fice|gain)/i.test(all);
+    var e = nom.length < 3 ? "Entrez le nom du projet."
+      : !(need > 0) ? "Entrez le montant à collecter."
+      : !(mn > 0) ? "Entrez la participation minimum."
+      : mn > need ? "Le minimum ne peut pas dépasser le montant à collecter."
+      : !(mo > 0) ? "Entrez la durée en mois."
+      : d.length < 10 ? "Ajoutez une description (10 caractères minimum)."
+      : r.length < 5 ? "Les risques sont obligatoires."
+      : c.length < 5 ? "Les conditions sont obligatoires."
+      : bad ? "Ne promettez jamais de bénéfices garantis ni « sans risque »." : "";
+    if (e) return say(pm, e);
+    say(pm, "Publication…", true);
+    var ins = await sb.from("projets").insert({ nom: nom, secteur: f.sec.value, description: d, montant_necessaire: need, minimum: mn, duree_mois: mo, risques: r, conditions: c });
+    if (ins.error) return say(pm, "Impossible de publier : " + ins.error.message);
+    await journal("Projet publié : " + nom);
+    [f.nom, f.need, f.min, f.desc, f.risk, f.cond].forEach(function(x){ x.value = ""; });
+    f.mois.value = "12";
+    say(pm, "Projet publié.", true);
+    listeProjets(list, true);
+  }));
+  m.appendChild(box);
+  m.appendChild(el("h3", "Tous les projets"));
+  m.appendChild(list);
+  await listeProjets(list, true);
+}
+
+/* actions avec motif (clients et agents) */
+async function histoire(id, zone){
+  var r = await sb.from("sanctions").select("type, motif, created_at").eq("profile_id", id).order("created_at", { ascending: false }).limit(5);
+  if (r.error || !r.data.length) { zone.textContent = "Aucune sanction enregistrée."; return; }
+  r.data.forEach(function(s){ zone.appendChild(el("div", fd(s.created_at) + " · " + s.type + " · " + s.motif)); });
+}
+function actions(card, c, boutons, refresh){
+  var ex = card.querySelector(".gest"); if (ex) { ex.remove(); return; }
+  var g = el("div", null, "gest"), mo = area(3), mm = msgEl(), hist = el("div", null, "sm");
+  g.appendChild(field("Motif (obligatoire, 10 caractères minimum)", mo));
+  g.appendChild(mm);
+  boutons.forEach(function(b){
+    g.appendChild(btn(b.label, b.cls || "btn line sm2", async function(){
+      var t = mo.value.trim();
+      if (t.length < 10) return say(mm, "Écrivez le motif (10 caractères minimum).");
+      if (b.confirm && !confirm(b.confirm)) return;
+      if (b.maj) {
+        var maj = Object.assign({ motif_statut: t, statut_le: new Date().toISOString() }, b.maj);
+        var u = await sb.from("profiles").update(maj).eq("id", c.id);
+        if (u.error) return say(mm, "Action impossible : " + u.error.message);
+        Object.assign(c, b.maj);
+      }
+      var e = await sanction(c.id, b.type, t);
+      if (e) return say(mm, "Sanction non enregistrée : " + e.message);
+      if (b.extra) await b.extra(t);
+      await journal(b.ok + " : " + c.nom);
+      toast(b.ok + ".");
+      refresh();
+    }));
+  });
+  g.appendChild(el("div", "Historique récent", "sm"));
+  g.appendChild(hist); histoire(c.id, hist);
+  card.appendChild(g);
+}
+
+/* 2) inscrits */
+async function panelInscrits(){
+  var m = panel("Inscrits");
+  var search = inp("text"); search.placeholder = "Rechercher un nom, un e-mail ou un téléphone";
+  m.appendChild(search);
+  var list = el("div"); m.appendChild(list);
+  var r = await sb.from("profiles").select("id, nom, email, telephone, statut, motif_statut, created_at").eq("role", "client").order("created_at", { ascending: false });
+  if (r.error) { list.textContent = "Impossible de charger la liste."; return; }
+  function draw(){
+    clear(list);
+    var q = search.value.trim().toLowerCase();
+    var L = r.data.filter(function(c){ return !q || ((c.nom || "") + " " + (c.email || "") + " " + (c.telephone || "")).toLowerCase().indexOf(q) > -1; });
+    if (!L.length) { list.textContent = "Aucun inscrit pour le moment."; return; }
+    L.forEach(function(c){
+      var card = el("div", null, "card"), top = el("div");
+      top.appendChild(el("span", c.statut, "badge b-" + c.statut)); top.appendChild(document.createTextNode(" ")); top.appendChild(el("b", c.nom));
+      card.appendChild(top);
+      card.appendChild(el("div", (c.email || "") + (c.telephone ? " · " + c.telephone : ""), "sm"));
+      card.appendChild(el("div", "Inscrit le " + fd(c.created_at), "sm"));
+      if (c.motif_statut && c.statut !== "actif") card.appendChild(el("div", "Motif : " + c.motif_statut, "sm"));
+      if (c.statut !== "supprime") {
+        card.appendChild(btn("Gérer ce compte", "btn line sm2", function(){
+          var B = [{ label: "Avertir", type: "avertissement", ok: "Avertissement enregistré" }];
+          if (c.statut === "bloque") B.push({ label: "Débloquer", type: "deblocage", maj: { statut: "actif" }, ok: "Compte débloqué" });
+          else B.push({ label: "Bloquer", cls: "btn red sm2", type: "blocage", maj: { statut: "bloque" }, ok: "Compte bloqué" });
+          B.push({ label: "Supprimer", cls: "btn red sm2", type: "suppression", maj: { statut: "supprime" },
+            confirm: "Supprimer ce compte ? La personne ne pourra plus se connecter.", ok: "Compte supprimé",
+            extra: async function(t){
+              await sb.from("comptes_supprimes").insert({ nom: c.nom, telephone_masque: "••••" + (c.telephone || "").replace(/\D/g, "").slice(-4), supprime_par: "Administrateur", motif: t });
+            } });
+          actions(card, c, B, draw);
+        }));
+      }
+      list.appendChild(card);
+    });
+  }
+  search.oninput = draw; draw();
+}
+
+/* 3) investissements */
+async function panelInvest(){
+  var m = panel("Investissements");
+  var r = await sb.from("investissements").select("id, montant, date_investissement, echeance, statut, client:client_id(nom, email), projet:projet_id(nom)").order("date_investissement", { ascending: false });
+  if (r.error) { m.appendChild(el("p", "Impossible de charger les investissements.", "sm")); return; }
+  var total = r.data.reduce(function(a, x){ return a + x.montant; }, 0);
+  var s = el("div", null, "card"); s.appendChild(el("div", "Total investi", "sm")); s.appendChild(el("b", fmt(total))); s.appendChild(el("div", r.data.length + " investissement(s)", "sm"));
+  m.appendChild(s);
+  if (!r.data.length) { m.appendChild(el("p", "Aucun investissement pour le moment.", "sm")); return; }
+  r.data.forEach(function(x){
+    var c = el("div", null, "card");
+    c.appendChild(el("b", x.projet ? x.projet.nom : "Projet"));
+    c.appendChild(el("div", (x.client ? x.client.nom : "Client") + " · " + fmt(x.montant), "sm"));
+    c.appendChild(el("div", "Investi le " + fd(x.date_investissement) + " · échéance " + fd(x.echeance) + " · " + x.statut, "sm"));
+    m.appendChild(c);
+  });
+}
+
+/* 4) agents */
+async function panelAgents(){
+  var m = panel("Agents");
+  var cl = await sb.from("profiles").select("id, nom, email").eq("role", "client").eq("statut", "actif").order("nom");
+  var ag = await sb.from("profiles").select("id, nom, email, statut, code_agent").eq("role", "agent").order("nom");
+  var box = el("div", null, "box"); box.appendChild(el("h3", "Nommer un agent"));
+  var opts = (cl.data || []).map(function(c){ return [c.id, c.nom + (c.email ? " (" + c.email + ")" : "")]; });
+  if (!opts.length) { box.appendChild(el("p", "Aucun client disponible. La personne doit d’abord créer un compte.", "sm")); }
+  else {
+    var s = sel(opts), note = area(3), nm = msgEl();
+    box.appendChild(field("Choisir un inscrit", s));
+    box.appendChild(field("Motif de la nomination (10 caractères minimum)", note));
+    box.appendChild(nm);
+    box.appendChild(btn("Nommer agent", "btn", async function(){
+      var t = note.value.trim();
+      if (t.length < 10) return say(nm, "Écrivez le motif (10 caractères minimum).");
+      var code = null, err = null;
+      for (var i = 0; i < 5; i++) {
+        code = "AG-" + (1000 + Math.floor(Math.random() * 9000));
+        var u = await sb.from("profiles").update({ role: "agent", code_agent: code, motif_statut: t, statut_le: new Date().toISOString() }).eq("id", s.value);
+        err = u.error; if (!err) break;
+        if (!/duplicate|unique/i.test(err.message)) break;
+      }
+      if (err) return say(nm, "Action impossible : " + err.message);
+      await sanction(s.value, "agent_nomme", t);
+      await journal("Agent nommé : " + code);
+      toast("Agent nommé. Code : " + code);
+      panelAgents();
+    }));
+  }
+  m.appendChild(box);
+  m.appendChild(el("h3", "Agents"));
+  var list = el("div"); m.appendChild(list);
+  if (!ag.data || !ag.data.length) { list.textContent = "Aucun agent pour le moment."; return; }
+  ag.data.forEach(function(a){
+    var card = el("div", null, "card"), top = el("div");
+    top.appendChild(el("span", a.statut, "badge b-" + a.statut)); top.appendChild(document.createTextNode(" ")); top.appendChild(el("b", a.nom));
+    card.appendChild(top);
+    card.appendChild(el("div", "Code : " + (a.code_agent || "—") + (a.email ? " · " + a.email : ""), "sm"));
+    card.appendChild(btn("Gérer cet agent", "btn line sm2", function(){
+      var B = [];
+      if (a.statut === "actif") B.push({ label: "Suspendre", cls: "btn red sm2", type: "agent_suspendu", maj: { statut: "suspendu" }, ok: "Agent suspendu" });
+      else B.push({ label: "Réactiver", type: "deblocage", maj: { statut: "actif" }, ok: "Agent réactivé" });
+      B.push({ label: "Retirer le rôle d’agent", cls: "btn red sm2", type: "agent_retire", maj: { role: "client", code_agent: null }, confirm: "Retirer le rôle d’agent à cette personne ?", ok: "Rôle d’agent retiré" });
+      actions(card, a, B, panelAgents);
+    }));
+    list.appendChild(card);
+  });
+}
+
+/* 5) annonces */
+async function panelAnnonces(){
+  var m = panel("Annonces");
+  var box = el("div", null, "box"); box.appendChild(el("h3", "Passer une annonce"));
+  var titre = inp("text"), texte = area(4), aud = sel([["tous", "Tous"], ["clients", "Clients"], ["agents", "Agents"]]), am = msgEl();
+  box.appendChild(field("Titre", titre));
+  box.appendChild(field("Message", texte));
+  box.appendChild(field("Destinataires", aud));
+  box.appendChild(am);
+  var list = el("div");
+  box.appendChild(btn("Publier l’annonce", "btn", async function(){
+    var t = titre.value.trim(), c = texte.value.trim();
+    if (t.length < 3) return say(am, "Entrez un titre (3 caractères minimum).");
+    if (c.length < 10) return say(am, "Écrivez le message (10 caractères minimum).");
+    var r = await sb.from("annonces").insert({ titre: t, contenu: c, audience: aud.value, auteur_id: moi.id });
+    if (r.error) return say(am, "Impossible de publier : " + r.error.message);
+    await journal("Annonce publiée : " + t);
+    titre.value = ""; texte.value = "";
+    say(am, "Annonce publiée.", true);
+    listeAnnonces(list);
+  }));
+  m.appendChild(box);
+  m.appendChild(el("h3", "Annonces publiées"));
+  m.appendChild(list);
+  await listeAnnonces(list);
+}
+async function listeAnnonces(list){
+  clear(list);
+  var r = await sb.from("annonces").select("id, titre, contenu, audience, actif, created_at").order("created_at", { ascending: false });
+  if (r.error) { list.textContent = "Impossible de charger les annonces."; return; }
+  if (!r.data.length) { list.textContent = "Aucune annonce pour le moment."; return; }
+  r.data.forEach(function(a){
+    var c = el("div", null, "card");
+    c.appendChild(el("b", a.titre));
+    c.appendChild(el("div", fd(a.created_at) + " · pour : " + a.audience + (a.actif ? "" : " · retirée"), "sm"));
+    c.appendChild(el("div", a.contenu));
+    c.appendChild(btn(a.actif ? "Retirer l’annonce" : "Republier", "btn line sm2", async function(){
+      var u = await sb.from("annonces").update({ actif: !a.actif }).eq("id", a.id);
+      if (u.error) return alert("Action impossible : " + u.error.message);
+      await journal((a.actif ? "Annonce retirée : " : "Annonce republiée : ") + a.titre);
+      listeAnnonces(list);
+    }));
+    list.appendChild(c);
+  });
+}
 
 sb.auth.getSession().then(function(r){ if (r.data.session) ouvrir(); });
 </script>
