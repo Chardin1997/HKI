@@ -6,25 +6,31 @@
 <title>HKI – Haitien Kapital Investisment</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
-:root{--night:#0B1E3F;--gold:#C9A24A;--soft:#F3F4F7;--muted:#5b667d;--line:#dde1ea;--bad:#b4452f;--ok:#2f7d4f}
+:root{--night:#0B1E3F;--gold:#C9A24A;--soft:#F3F4F7;--muted:#5b667d;--line:#dde1ea;--bad:#b4452f;--ok:#2f7d4f;--wait:#9a6b00}
 *{box-sizing:border-box}
 body{margin:0;background:#fff;color:#14213d;font:16px/1.55 system-ui,Arial,sans-serif}
-.wrap{max-width:420px;margin:0 auto;padding:1.2rem}
-h1{font-family:Georgia,serif;color:var(--night);font-size:2rem;margin:.4rem 0}
-h2{font-family:Georgia,serif;color:var(--night)}
+.wrap{max-width:460px;margin:0 auto;padding:1.2rem}
+h2{font-family:Georgia,serif;color:var(--night);margin:1.2rem 0 .4rem}
 .logo{font-family:Georgia,serif;font-size:2.6rem;font-weight:700;color:var(--night);text-align:center;letter-spacing:.06em}
 .logo b{color:var(--gold)}
 .sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:1.2rem}
 label{display:block;font-size:.9rem;font-weight:600;margin-top:.9rem}
-input{width:100%;padding:.8rem;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:.3rem}
+input,select,textarea{width:100%;padding:.8rem;border:1px solid var(--line);border-radius:10px;font:inherit;margin-top:.3rem;background:#fff;color:#14213d}
 button{font:inherit;cursor:pointer}
 .btn{width:100%;background:var(--gold);color:#1a1405;border:0;border-radius:10px;padding:.85rem;font-weight:700;margin-top:1.1rem}
 .btn.line{background:#fff;border:1.5px solid var(--night);color:var(--night)}
+.btn.sm2{padding:.6rem;margin-top:.6rem}
 .link{background:none;border:0;color:var(--night);text-decoration:underline;padding:0}
 .msg{min-height:1.4rem;margin-top:.7rem;font-size:.9rem;color:var(--bad)}
 .msg.ok{color:var(--ok)}
-.card{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:1rem}
+.card{background:var(--soft);border:1px solid var(--line);border-radius:14px;padding:1rem;margin-top:.8rem}
+.card b{font-family:Georgia,serif;font-size:1.15rem}
 .sm{font-size:.85rem;color:var(--muted)}
+.bar{height:8px;background:var(--line);border-radius:9px;overflow:hidden;margin:.5rem 0 .3rem}
+.bar i{display:block;height:100%;background:var(--gold)}
+.badge{display:inline-block;font-size:.75rem;font-weight:700;border-radius:99px;padding:.1rem .6rem;border:1px solid currentColor}
+.b-actif{color:var(--ok)}.b-suspendu{color:var(--bad)}
+.box{border-top:3px solid var(--gold);margin-top:1.2rem;padding-top:.2rem}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -60,9 +66,33 @@ button{font:inherit;cursor:pointer}
   </section>
 
   <section id="home" hidden>
-    <h2 id="hello"></h2>
+    <h2 id="hello" style="margin-top:0"></h2>
     <div class="card"><div class="sm">Votre rôle</div><b id="role"></b></div>
-    <div class="card"><div class="sm">Projets disponibles</div><div id="projets"></div></div>
+
+    <div id="admin" class="box" hidden>
+      <h2>Ajouter un projet</h2>
+      <label for="p-nom">Nom du projet</label>
+      <input id="p-nom" type="text">
+      <label for="p-sec">Secteur</label>
+      <select id="p-sec"></select>
+      <label for="p-need">Montant à collecter (HTG)</label>
+      <input id="p-need" type="number" inputmode="numeric">
+      <label for="p-min">Participation minimum (HTG)</label>
+      <input id="p-min" type="number" inputmode="numeric">
+      <label for="p-mois">Durée (mois)</label>
+      <input id="p-mois" type="number" inputmode="numeric" value="12">
+      <label for="p-desc">Description</label>
+      <textarea id="p-desc" rows="3"></textarea>
+      <label for="p-risk">Risques</label>
+      <textarea id="p-risk" rows="3"></textarea>
+      <label for="p-cond">Conditions de remboursement ou de distribution</label>
+      <textarea id="p-cond" rows="3"></textarea>
+      <div class="msg" id="p-msg" role="alert"></div>
+      <button class="btn" id="p-go">Publier le projet</button>
+    </div>
+
+    <h2 id="ptitle">Projets disponibles</h2>
+    <div id="projets"></div>
     <p class="sm">Investir comporte des risques. Aucun gain n’est garanti.</p>
     <button class="btn line" id="out">Se déconnecter</button>
   </section>
@@ -73,14 +103,17 @@ var SUPABASE_URL = "https://ejyvjrpfblpplnjuhqua.supabase.co";
 var SUPABASE_KEY = "sb_publishable_yktmeXVeEjcD5eoCjzDAHA_6PuBd2tV";
 var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var $ = function(i){ return document.getElementById(i); };
+var SECTEURS = ["Agriculture et élevage","Immobilier et construction","Commerce et distribution","Entrepreneuriat et PME","Énergies renouvelables","Technologie et innovation","Autres projets économiques"];
+var monRole = null, monId = null;
 
-function show(id){
-  ["login","signup","home"].forEach(function(s){ $(s).hidden = (s !== id); });
-}
-function msg(id, text, ok){
-  $(id).textContent = text;
-  $(id).className = ok ? "msg ok" : "msg";
-}
+SECTEURS.forEach(function(s){
+  var o = document.createElement("option"); o.textContent = s; $("p-sec").appendChild(o);
+});
+
+function show(id){ ["login","signup","home"].forEach(function(s){ $(s).hidden = (s !== id); }); }
+function msg(id, text, ok){ $(id).textContent = text; $(id).className = ok ? "msg ok" : "msg"; }
+function fmt(n){ return Number(n).toLocaleString("fr-FR") + " HTG"; }
+function el(tag, text, cls){ var e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; }
 
 $("to-signup").onclick = function(){ show("signup"); };
 $("to-login").onclick = function(){ show("login"); };
@@ -110,26 +143,88 @@ $("l-go").onclick = async function(){
   await ouvrir();
 };
 
+async function journal(action){
+  if (!monId) return;
+  await sb.from("journal").insert({ acteur_id: monId, action: action });
+}
+
+async function chargerProjets(){
+  var box = $("projets"); box.textContent = "";
+  var r = await sb.from("projets")
+    .select("id, nom, secteur, montant_necessaire, montant_collecte, minimum, duree_mois, statut, risques, conditions")
+    .order("created_at", { ascending: false });
+  if (r.error) { box.textContent = "Impossible de charger les projets."; return; }
+  if (!r.data.length) { box.textContent = "Aucun projet pour le moment."; return; }
+  r.data.forEach(function(p){
+    var c = el("div", null, "card");
+    var top = el("div");
+    if (monRole === "admin") { top.appendChild(el("span", p.statut === "actif" ? "Actif" : "Suspendu", "badge b-" + p.statut)); top.appendChild(document.createTextNode(" ")); }
+    top.appendChild(el("b", p.nom));
+    c.appendChild(top);
+    c.appendChild(el("div", p.secteur, "sm"));
+    var pc = Math.min(100, Math.round(p.montant_collecte / p.montant_necessaire * 100));
+    var bar = el("div", null, "bar"); var fill = document.createElement("i"); fill.style.width = pc + "%"; bar.appendChild(fill);
+    c.appendChild(bar);
+    c.appendChild(el("div", fmt(p.montant_collecte) + " collectés sur " + fmt(p.montant_necessaire) + " (" + pc + " %)", "sm"));
+    c.appendChild(el("div", "Minimum " + fmt(p.minimum) + " · " + p.duree_mois + " mois", "sm"));
+    if (p.risques) c.appendChild(el("div", "Risques : " + p.risques, "sm"));
+    if (p.conditions) c.appendChild(el("div", "Conditions : " + p.conditions, "sm"));
+    if (monRole === "admin") {
+      var b = el("button", p.statut === "actif" ? "Suspendre" : "Réactiver", "btn line sm2");
+      b.onclick = async function(){
+        var nv = p.statut === "actif" ? "suspendu" : "actif";
+        var u = await sb.from("projets").update({ statut: nv }).eq("id", p.id);
+        if (u.error) return alert("Action impossible : " + u.error.message);
+        await journal("Projet « " + p.nom + " » : " + (nv === "actif" ? "réactivé" : "suspendu"));
+        chargerProjets();
+      };
+      c.appendChild(b);
+    }
+    box.appendChild(c);
+  });
+}
+
+$("p-go").onclick = async function(){
+  var nom = $("p-nom").value.trim(), need = parseInt($("p-need").value, 10), mn = parseInt($("p-min").value, 10), mo = parseInt($("p-mois").value, 10);
+  var d = $("p-desc").value.trim(), r = $("p-risk").value.trim(), c = $("p-cond").value.trim(), all = d + " " + r + " " + c;
+  var bad = /(sans risque|100 ?%|rendement garanti|b[ée]n[ée]fices? garantis?|gains? garantis?)/i.test(all)
+         && !/(aucun|pas de|non)\s+(rendement|b[ée]n[ée]fice|gain)/i.test(all);
+  var e = nom.length < 3 ? "Entrez le nom du projet."
+    : !(need > 0) ? "Entrez le montant à collecter."
+    : !(mn > 0) ? "Entrez la participation minimum."
+    : mn > need ? "Le minimum ne peut pas dépasser le montant à collecter."
+    : !(mo > 0) ? "Entrez la durée en mois."
+    : d.length < 10 ? "Ajoutez une description (10 caractères minimum)."
+    : r.length < 5 ? "Les risques sont obligatoires."
+    : c.length < 5 ? "Les conditions sont obligatoires."
+    : bad ? "Ne promettez jamais de bénéfices garantis ni « sans risque »." : "";
+  if (e) return msg("p-msg", e);
+  msg("p-msg", "Publication…", true);
+  var ins = await sb.from("projets").insert({ nom: nom, secteur: $("p-sec").value, description: d, montant_necessaire: need, minimum: mn, duree_mois: mo, risques: r, conditions: c });
+  if (ins.error) return msg("p-msg", "Impossible de publier : " + ins.error.message);
+  await journal("Projet publié : " + nom);
+  ["p-nom","p-need","p-min","p-desc","p-risk","p-cond"].forEach(function(i){ $(i).value = ""; });
+  $("p-mois").value = "12";
+  msg("p-msg", "Projet publié.", true);
+  chargerProjets();
+};
+
 async function ouvrir(){
   var u = await sb.auth.getUser();
   if (!u.data.user) return show("login");
   var p = await sb.from("profiles").select("nom, role, statut").eq("id", u.data.user.id).single();
   if (p.error || !p.data) { await sb.auth.signOut(); show("login"); return msg("l-msg", "Profil introuvable."); }
   if (p.data.statut !== "actif") { await sb.auth.signOut(); show("login"); return msg("l-msg", "Ce compte est suspendu."); }
+  monRole = p.data.role; monId = u.data.user.id;
   $("hello").textContent = "Bonjour " + p.data.nom;
-  $("role").textContent = p.data.role;
-  var pr = await sb.from("projets").select("nom, secteur").order("created_at", { ascending: false });
-  var box = $("projets"); box.textContent = "";
-  if (pr.error || !pr.data.length) { box.textContent = "Aucun projet pour le moment."; }
-  else pr.data.forEach(function(x){
-    var d = document.createElement("div");
-    d.textContent = x.nom + " (" + x.secteur + ")";
-    box.appendChild(d);
-  });
+  $("role").textContent = monRole;
+  $("admin").hidden = (monRole !== "admin");
+  $("ptitle").textContent = monRole === "admin" ? "Tous les projets" : "Projets disponibles";
   show("home");
+  await chargerProjets();
 }
 
-$("out").onclick = async function(){ await sb.auth.signOut(); show("login"); };
+$("out").onclick = async function(){ await sb.auth.signOut(); monRole = null; monId = null; show("login"); };
 
 sb.auth.getSession().then(function(r){ if (r.data.session) ouvrir(); });
 </script>
